@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gully Cricket Score v2.2</title>
+    <style>
+        /* CSS for simple, mobile-friendly design */
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 10px;
+            background-color: #f5f5f5;
+        }
+        .scorecard-container {
+            max-width: 400px;
+            margin: auto;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+        }
+        /* Top display (Score and Overs) */
+        h2#score {
+            font-size: 3.5em;
+            font-weight: bold;
+            color: #333;
+            margin: 10px 0 0;
+        }
+        h3#overs {
+            font-size: 1.8em;
+            color: #666;
+            margin: 0 0 10px;
+        }
+        
+        /* Player Display Section */
+        .player-info-container {
+            font-size: 1.1em;
+            padding: 5px 0;
+            border-top: 1px solid #ddd;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 15px;
+        }
+        .player-info {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+        .player-info span {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .player-info .striker {
+            color: #dc3545; /* Highlight the striker in red */
+        }
+        .bowler-name {
+            color: #28a745; /* Highlight the bowler in green */
+        }
+
+        /* Buttons */
+        .buttons-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr); 
+            gap: 10px;
+        }
+        button {
+            padding: 15px 5px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            color: white;
+            transition: background-color 0.2s;
+        }
+        .run-btn { background-color: #007bff; }
+        .run-btn:active { background-color: #0056b3; }
+
+        #out-btn { background-color: #dc3545; }
+        #out-btn:active { background-color: #a71d2a; }
+
+        #wide-btn, #noball-btn { 
+            background-color: #ffc107; 
+            color: #333;
+        }
+        #wide-btn:active, #noball-btn:active { 
+            background-color: #e0a800; 
+        }
+
+        #undo-btn, #reset-btn, #sub-btn {
+            margin-top: 15px;
+            width: 100%;
+        }
+        #undo-btn { background-color: #6c757d; }
+        #undo-btn:active { background-color: #5a6268; }
+        
+        #reset-btn {
+            background-color: #17a2b8; /* Teal color for reset */
+            margin-top: 5px;
+        }
+        #reset-btn:active { background-color: #138496; }
+
+        #sub-btn {
+            background-color: #ff9900;
+            font-size: 0.9em;
+            padding: 10px;
+        }
+        
+        .setup-screen {
+            padding-top: 15px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        input[type="text"] {
+            width: 90%;
+            padding: 10px;
+            margin: 5px 0 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="scorecard-container">
+        <h1>Current Score</h1>
+        <h2 id="score">0/0</h2>
+        <h3 id="overs">0.0 Overs</h3>
+
+        <div class="setup-screen" id="setupScreen">
+            <h2>Game Setup</h2>
+            <input type="text" id="batsman1Input" placeholder="Batsman 1 Name (Striker)">
+            <input type="text" id="batsman2Input" placeholder="Batsman 2 Name (Non-Striker)">
+            <input type="text" id="bowlerInput" placeholder="Bowler Name">
+            <button id="startButton" class="run-btn">Start Match</button>
+        </div>
+
+        <div id="gameScreen" class="hidden">
+            <div class="player-info-container">
+                <div class="player-info">
+                    <p>Striker: <span id="strikerName" class="striker"></span></p>
+                    <p>Non-Striker: <span id="nonStrikerName"></span></p>
+                </div>
+                 <div class="player-info" style="justify-content: center;">
+                    <p>Bowler: <span id="bowlerName" class="bowler-name"></span></p>
+                </div>
+            </div>
+
+            <div class="buttons-grid">
+                <button class="run-btn" data-runs="1">1 Run</button>
+                <button class="run-btn" data-runs="2">2 Runs</button>
+                <button class="run-btn" data-runs="3">3 Runs</button>
+                <button class="run-btn" data-runs="4">4 Runs</button>
+                <button class="run-btn" data-runs="6">6 Runs</button>
+                <button class="run-btn" data-runs="0">Dot Ball</button>
+                
+                <button id="wide-btn">Wide (+1, Re-ball)</button>
+                <button id="noball-btn">No Ball (Re-ball)</button>
+                <button id="out-btn">Wicket (Out)</button>
+                <button id="swap-btn" class="run-btn">Swap Batsmen</button>
+            </div>
+            
+            <button id="sub-btn">SUBSTITUTE / RENAME PLAYER</button>
+
+            <button id="undo-btn">UNDO LAST ACTION</button>
+            <button id="reset-btn">RESET / NEW INNINGS</button>
+        </div>
+    </div>
+
+    <script>
+        // JAVASCRIPT LOGIC
+        let currentState = {
+            score: 0,
+            wickets: 0,
+            overs: 0,
+            balls: 0,
+            batsman1: 'Striker',
+            batsman2: 'Non-Striker',
+            bowler: 'Bowler',
+            strikerIndex: 1 // 1 or 2
+        };
+        let history = [];
+
+        // DOM elements
+        const scoreEl = document.getElementById('score');
+        const oversEl = document.getElementById('overs');
+        const strikerNameEl = document.getElementById('strikerName');
+        const nonStrikerNameEl = document.getElementById('nonStrikerName');
+        const bowlerNameEl = document.getElementById('bowlerName');
+        const setupScreen = document.getElementById('setupScreen');
+        const gameScreen = document.getElementById('gameScreen');
+
+        // --- SETUP & UTILITY FUNCTIONS ---
+
+        function saveState() {
+            history.push({...currentState}); 
+            if (history.length > 50) { history.shift(); }
+        }
+
+        function swapBatsmen() {
+            currentState.strikerIndex = (currentState.strikerIndex === 1) ? 2 : 1;
+        }
+
+        function updateScoreboard() {
+            // Update scores
+            scoreEl.textContent = `${currentState.score}/${currentState.wickets}`;
+            oversEl.textContent = `${currentState.overs}.${currentState.balls} Overs`;
+
+            // Update batsman names
+            if (currentState.strikerIndex === 1) {
+                strikerNameEl.textContent = currentState.batsman1;
+                nonStrikerNameEl.textContent = currentState.batsman2;
+            } else {
+                strikerNameEl.textContent = currentState.batsman2;
+                nonStrikerNameEl.textContent = currentState.batsman1;
+            }
+            
+            // Update bowler name
+            bowlerNameEl.textContent = currentState.bowler;
+        }
+
+        // --- GAME LOGIC ---
+
+        // Handles the end of a legal delivery
+        function endBall(runsScored) {
+            currentState.balls++;
+            // Check for run swap after an odd run (1 or 3)
+            if (runsScored % 2 !== 0) {
+                swapBatsmen();
+            }
+            
+            // Check for end of over
+            if (currentState.balls === 6) {
+                currentState.balls = 0;
+                currentState.overs++;
+                swapBatsmen(); // Swap batsmen at end of over
+                
+                // Prompt for new bowler at the end of the over
+                const newBowler = prompt(`End of Over ${currentState.overs}. Enter the name of the NEW Bowler:`, currentState.bowler);
+                if (newBowler) {
+                    currentState.bowler = newBowler.trim();
+                }
+            }
+            updateScoreboard();
+        }
+
+        // --- BUTTON HANDLERS ---
+
+        // Handle Run/Dot buttons
+        document.querySelectorAll('.run-btn[data-runs]').forEach(button => {
+            button.addEventListener('click', (e) => {
+                saveState();
+                const runs = parseInt(e.target.dataset.runs);
+                currentState.score += runs;
+                endBall(runs);
+            });
+        });
+
+        // Handle Wide Ball (1 Run + Re-ball)
+        document.getElementById('wide-btn').addEventListener('click', () => {
+            saveState();
+            currentState.score += 1; 
+            updateScoreboard();
+        });
+
+        // Handle No Ball (No Run + Re-ball)
+        document.getElementById('noball-btn').addEventListener('click', () => {
+            saveState();
+            updateScoreboard();
+        });
+
+        // Handle Out/Wicket 
+        document.getElementById('out-btn').addEventListener('click', () => {
+            saveState();
+            
+            if (currentState.wickets >= 10) { 
+                alert("All wickets are down!");
+                return;
+            }
+
+            const strikerName = currentState.strikerIndex === 1 ? currentState.batsman1 : currentState.batsman2;
+            const nonStrikerName = currentState.strikerIndex === 1 ? currentState.batsman2 : currentState.batsman1;
+            
+            // 1. Which batsman is out?
+            const batsmanOutOption = prompt(`Who is OUT? Enter 'S' for ${strikerName} (Striker) or 'N' for ${nonStrikerName} (Non-Striker):`, 'S');
+            
+            let isStrikerOut = false;
+
+            if (batsmanOutOption && batsmanOutOption.toUpperCase() === 'S') {
+                isStrikerOut = true;
+            } else if (batsmanOutOption && batsmanOutOption.toUpperCase() === 'N') {
+                isStrikerOut = false;
+            } else {
+                alert("Wicket cancelled. Please use 'S' or 'N'.");
+                history.pop();
+                return;
+            }
+
+            // 2. Who is the new batsman?
+            const outName = isStrikerOut ? strikerName : nonStrikerName;
+            const newBatsmanName = prompt(`Wicket: ${outName} is OUT. Enter the name of the new incoming batsman:`);
+            
+            if (!newBatsmanName) {
+                alert("Wicket cancelled: New batsman name needed.");
+                history.pop();
+                return;
+            }
+
+            // 3. Update the state
+            currentState.wickets++;
+
+            if (isStrikerOut) {
+                if (currentState.strikerIndex === 1) {
+                    currentState.batsman1 = newBatsmanName.trim();
+                } else {
+                    currentState.batsman2 = newBatsmanName.trim();
+                }
+            } else {
+                if (currentState.strikerIndex === 1) {
+                    currentState.batsman2 = newBatsmanName.trim();
+                } else {
+                    currentState.batsman1 = newBatsmanName.trim();
+                }
+            }
+            
+            // 4. Do they take strike?
+            // Simple question to decide if strike should change on the wicket ball
+            const takesStrike = confirm(`Does the new batsman, ${newBatsmanName}, take the strike? (Click OK for Yes, Cancel for No)`);
+            
+            if (takesStrike && !isStrikerOut) {
+                 // Non-striker out, but new batsman takes strike. Need to swap.
+                 swapBatsmen();
+            } else if (!takesStrike && isStrikerOut) {
+                // Striker out, but new batsman does NOT take strike (old non-striker comes to strike). No swap needed here.
+            }
+            
+            endBall(0); // Wicket counts as a ball
+            updateScoreboard();
+        });
+        
+        // Manual Batsmen Swap (for run-outs or mistakes)
+        document.getElementById('swap-btn').addEventListener('click', () => {
+            saveState();
+            swapBatsmen();
+            updateScoreboard();
+        });
+
+        // NEW: Substitute/Rename Player
+        document.getElementById('sub-btn').addEventListener('click', () => {
+            saveState();
+            const option = prompt("Which player do you want to substitute/rename? Enter 'S' for Striker, 'N' for Non-Striker, or 'B' for Bowler:", 'S');
+
+            if (!option) {
+                history.pop(); // Cancelled
+                return;
+            }
+
+            const upperOption = option.toUpperCase();
+            let currentName;
+            let newName;
+
+            if (upperOption === 'S') {
+                currentName = currentState.strikerIndex === 1 ? currentState.batsman1 : currentState.batsman2;
+                newName = prompt(`Renaming STRIKER (${currentName}). Enter NEW name:`);
+                if (newName) {
+                    if (currentState.strikerIndex === 1) {
+                        currentState.batsman1 = newName.trim();
+                    } else {
+                        currentState.batsman2 = newName.trim();
+                    }
+                }
+            } else if (upperOption === 'N') {
+                currentName = currentState.strikerIndex === 1 ? currentState.batsman2 : currentState.batsman1;
+                newName = prompt(`Renaming NON-STRIKER (${currentName}). Enter NEW name:`);
+                if (newName) {
+                    if (currentState.strikerIndex === 1) {
+                        currentState.batsman2 = newName.trim();
+                    } else {
+                        currentState.batsman1 = newName.trim();
+                    }
+                }
+            } else if (upperOption === 'B') {
+                currentName = currentState.bowler;
+                newName = prompt(`Renaming BOWLER (${currentName}). Enter NEW name:`);
+                if (newName) {
+                    currentState.bowler = newName.trim();
+                }
+            } else {
+                alert("Invalid option. Please enter S, N, or B.");
+                history.pop();
+                return;
+            }
+            
+            if (newName) {
+                updateScoreboard();
+            } else {
+                history.pop();
+            }
+        });
+
+
+        // Handle UNDO
+        document.getElementById('undo-btn').addEventListener('click', () => {
+            if (history.length > 0) {
+                const lastState = history.pop();
+                currentState = {...lastState}; 
+                updateScoreboard();
+            } else {
+                alert("Cannot Undo. No history saved.");
+            }
+        });
+        
+        // Handle RESET / NEW INNINGS
+        document.getElementById('reset-btn').addEventListener('click', () => {
+             if (confirm("Are you sure you want to reset the score for a new innings/match?")) {
+                currentState = {
+                    score: 0,
+                    wickets: 0,
+                    overs: 0,
+                    balls: 0,
+                    batsman1: 'Striker',
+                    batsman2: 'Non-Striker',
+                    bowler: 'Bowler',
+                    strikerIndex: 1
+                };
+                history = [];
+                setupScreen.classList.remove('hidden');
+                gameScreen.classList.add('hidden');
+                document.getElementById('batsman1Input').value = '';
+                document.getElementById('batsman2Input').value = '';
+                document.getElementById('bowlerInput').value = '';
+                updateScoreboard();
+             }
+        });
+        
+        // --- START BUTTON LOGIC ---
+        document.getElementById('startButton').addEventListener('click', () => {
+            const b1 = document.getElementById('batsman1Input').value.trim() || 'Player A';
+            const b2 = document.getElementById('batsman2Input').value.trim() || 'Player B';
+            const bowler = document.getElementById('bowlerInput').value.trim() || 'Bowler 1';
+            
+            currentState.batsman1 = b1;
+            currentState.batsman2 = b2;
+            currentState.bowler = bowler;
+            currentState.strikerIndex = 1; 
+            
+            setupScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+            
+            updateScoreboard();
+        });
+
+        // Initial setup on load
+        updateScoreboard();
+    </script>
+</body>
+</html>
